@@ -35,10 +35,10 @@ NS_LOG_COMPONENT_DEFINE ("BsmApplication");
 // chnahe the followig values for experiment
 //#define ADAPTIVE_PRIO
 
-#define TTC_THRESH 5.0
-#define TTC_THRESH_UPPER 15.0
-#define CRASH_THRESHOLD 4.8
-#define PRIO_MANUEVER_THRESHOLD 5.0
+//#define TTC_THRESH 5.0
+//#define TTC_THRESH_UPPER 15.0
+//#define CRASH_THRESHOLD 4.8
+//#define PRIO_MANUEVER_THRESHOLD 5.0
 #define NUM_LANES 3
 
 namespace ns3 {
@@ -198,7 +198,7 @@ BsmApplication::BsmApplication ()
     m_unirv (0),
     m_nodeId (0),
     m_chAccessMode (0),
-    m_txMaxDelay (MilliSeconds (50)),
+    m_txMaxDelay (MilliSeconds (30)),
     m_prevTxDelay (MilliSeconds (0)),
     m_prioritytag (1)
     //m_CSVfileName3("transmit_output.csv")
@@ -563,11 +563,11 @@ BsmApplication::GeneratePriorityWaveTraffic (Ptr<Socket> socket, uint32_t pktSiz
 {
 	NS_LOG_FUNCTION (this);
 
-	int min_interval=100;
+	int min_interval=MIN_INTERVAL;
 	int loop_min_interval = min_interval;
 
 #ifdef ADAPTIVE_PRIO
-	int max_interval=1000;
+	int max_interval=MAX_INTERVAL;
 	int max_priority=5;
 	int min_priority=1;
 	loop_min_interval = max_interval;
@@ -586,6 +586,17 @@ BsmApplication::GeneratePriorityWaveTraffic (Ptr<Socket> socket, uint32_t pktSiz
 		int txNodeId = sendingNodeId;
 		Ptr<Node> txNode = GetNode (txNodeId);
 		Ptr<MobilityModel> txPosition = txNode->GetObject<MobilityModel> ();
+
+    Ptr<ConstantVelocityMobilityModel> mob = txNode-> GetObject<ConstantVelocityMobilityModel>();
+    NS_ASSERT(mob);
+    Vector posm = mob->GetPosition (); // Get position
+    Vector vel = mob->GetVelocity (); // Get velocity
+    if(posm.x > ROAD_LENGTH_NUM){
+        mob->SetPosition(Vector(posm.x - ROAD_LENGTH_NUM, posm.y, posm.z));
+        mob->SetVelocity(vel);
+      }
+
+
 		NS_ASSERT (txPosition != 0);
 		uint32_t temp_MsgID=0;
 		double priority;
@@ -1328,7 +1339,7 @@ bool BsmApplication::NodeInBetween (int nid1, int nid2) {
     	int c_posy = (mob_c->GetPosition ()).y;
 
     	if ((std::abs(n1_posy-c_posy)<=m_lane_thres) && (x1 <= c_posx) && (c_posx <= x2)){
-    		std::cout << "nodes in between n1=" << nid1 << " c=" << i << " n2=" << nid2 << std::endl;
+    		std::cout << "nodes in between txNode: " << nid1 << " rxNode: " << nid2 << " c= " << i <<" c_posx: "<< c_posx <<" c_posy: "<< c_posy << std::endl;
     		return true;
     	}
     }
@@ -1362,14 +1373,15 @@ void BsmApplication::PrintCrashStatus(int crash_num) {
 void BsmApplication::ReInitNodes () {
 	Ptr<UniformRandomVariable> var2 = CreateObject<UniformRandomVariable> ();
 	Ptr<NormalRandomVariable> var=CreateObject<NormalRandomVariable> ();
-	int64_t stream = 2;
-	int64_t stream2 = 2;
+	//int64_t stream = 4;
+  static std::atomic<int64_t> stream(3);
+	int64_t stream2 = 4;
 	var->SetStream (stream);
 	var2->SetStream (stream2);
   static int num_lanes=NUM_LANES;
   int lane_pos[NUM_LANES] = {0};
   int curr_lane =0;
-  double lane_y[]  = {2.0, 6.0, 8.0};
+  double lane_y[]  = {2.0, 6.0, 10.0};
   double veh_spacing=ROAD_LENGTH_NUM*num_lanes/m_adhocTxInterfaces->GetN();
 
 	for(unsigned int i=0;i< m_adhocTxInterfaces->GetN (); i++){
@@ -1377,7 +1389,7 @@ void BsmApplication::ReInitNodes () {
 		Vector posm = mob->GetPosition (); // Get position
     double x = lane_pos[curr_lane];
     mob->SetPosition(Vector(x, lane_y[curr_lane], posm.y));
-    Vector node_vel=Vector(30+std::sqrt(16)*var->GetValue (), 0.0, 0.0);
+    Vector node_vel=Vector(MEAN_NODE_SPEED+std::sqrt(STD_DEV)*var->GetValue (), 0.0, 0.0);
     //Vector node_vel=Vector(30+0.5*var->GetValue (), 0.0, 0.0);
     mob->SetVelocity(node_vel);
     posm = mob->GetPosition (); // Get position
@@ -1390,6 +1402,7 @@ void BsmApplication::ReInitNodes () {
     if (curr_lane > 2)
       curr_lane =0;
 	}
+  stream++;
 }
 
 
@@ -1440,7 +1453,7 @@ void BsmApplication::HandleAdaptivePriorityReceivedBsmPacket (Ptr<Node> txNode,
       PrintCrashStatus(crashes);
       crashes++;
       double now_time = Simulator::Now().GetMilliSeconds();
-			if( now_time - last_crash < 2000){
+			if( ((now_time - last_crash) < 1000) || (now_time<1500)){
 				std::cout << "Time: " << Simulator::Now().GetMilliSeconds ()  << " early crash " << crashes  << " txNode: " << txNodeId  << " rxNode: " << rxNodeId << " MsgId: " << MsgId << " ttc: " << temp_ttc<< " priorityrxtx: "
 						  << priority_rxtx << " priority: " << priority  << " logx_recv" << std::endl ;
 				mob_rx->SetVelocity(Vector(vel_tx.x,0.0,0.0));
@@ -1455,13 +1468,16 @@ void BsmApplication::HandleAdaptivePriorityReceivedBsmPacket (Ptr<Node> txNode,
 
 		}
 		else {
-			if (priority_rxtx >= PRIO_MANUEVER_THRESHOLD ){ // && !NodeInBetween(txNodeId,rxNodeId)) {
+			if (priority_rxtx >= PRIO_MANUEVER_THRESHOLD && !NodeInBetween(txNodeId,rxNodeId)){ // && !NodeInBetween(txNodeId,rxNodeId)) {
 				manuevers++;
 				std::cout<< "Time: " << Simulator::Now().GetMilliSeconds ()  << " corrc occurred" << manuevers  << " txNode: " << txNodeId  << " rxNode: " << rxNodeId << " MsgId: " << MsgId << " ttc: " << temp_ttc<< " priorityrxtx: "
 						<< priority_rxtx << " priority: " << priority << " logx_recv" << std::endl ;
 				if ( (posm_rx.x <= posm_tx.x) && (vel_rx.x > vel_tx.x)) {
           Time waveInterPacketInterval = m_waveInterval;
-					mob_rx->SetVelocity(Vector(vel_tx.x,0.0,0.0));
+					//mob_rx->SetVelocity(Vector(vel_tx.x,0.0,0.0));////change to original velocity code
+          mob_rx->SetVelocity(Vector(vel_tx.x,0.0,0.0));//switch vehicle position code
+  			  mob_tx->SetVelocity(Vector(vel_rx.x,0.0,0.0));
+
 #ifdef ADAPTIVE_PRIO
           // cancel the existing schedule end execute it now
           Simulator::Cancel(NodeSchedule[rxNodeId]);
@@ -1470,7 +1486,9 @@ void BsmApplication::HandleAdaptivePriorityReceivedBsmPacket (Ptr<Node> txNode,
 #endif
         } //  m_wavePacketSize, totalTxTime.GetSeconds(), waveInterPacketInterval
 				else {
-					mob_tx->SetVelocity(Vector(vel_rx.x,0.0,0.0));
+					//mob_tx->SetVelocity(Vector(vel_rx.x,0.0,0.0));//change to original velocity code
+          //mob_rx->SetVelocity(Vector(vel_tx.x,0.0,0.0));//switch position code
+  				//mob_tx->SetVelocity(Vector(vel_rx.x,0.0,0.0));
         }
 			}
 			else {

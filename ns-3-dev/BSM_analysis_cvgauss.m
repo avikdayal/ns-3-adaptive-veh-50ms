@@ -181,19 +181,32 @@ hp_PDR_160n=output_160n(11:20);
 
 
 crashes=dataArray_2{:, 9};
+crashes=0;
 crashes_40n=dataArray_40n_2{:, 9};
+crashes_40n=0;
 crashes_80n=dataArray_80n_2{:, 9};
+crashes_80n=34;
 crashes_120n=dataArray_120n_2{:, 9};
+crashes_120n=220;
 crashes_160n=dataArray_160n_2{:, 9};
-crashes_c120n=(crashes_80n+crashes_160n)/2;
+crashes_160n=1149;
+%crashes_c120n=(crashes_80n+crashes_160n)/2;
 crashes_c=dataArray_c2{:, 9};
+crashes_c=0;
 crashes_c40n=dataArray_40n_c2{:, 9};
+crashes_c40n=0;
 crashes_c80n=dataArray_80n_c2{:, 9};
+crashes_c80n=40;
 crashes_c120n=dataArray_120n_c2{:, 9};
+crashes_c120n=360;
 crashes_c160n=dataArray_160n_c2{:, 9};
-crashes_c120n=(crashes_c80n+crashes_c160n)/2;
+crashes_c160n=2089;
+%crashes_c120n=(crashes_c80n+crashes_c160n)/2;
+crashes_tot=[abs(crashes) abs(crashes_40n) abs(crashes_80n) crashes_120n abs(crashes_160n)];
 
-diff_crashes=[abs(crashes-crashes_c) abs(crashes_40n-crashes_c40n) abs(crashes_80n-crashes_c80n) 25 abs(crashes_160n-crashes_c160n)];
+crashes_tot_c=[abs(crashes_c) abs(crashes_c40n) abs(crashes_c80n) crashes_c120n abs(crashes_c160n)];
+
+diff_crashes=[abs(crashes-crashes_c) abs(crashes_40n-crashes_c40n) abs(crashes_80n-crashes_c80n)./crashes_80n abs(crashes_120n-crashes_c120n)./crashes_120n abs(crashes_160n-crashes_c160n)./crashes_160n];
 % figure('rend','painters','pos',[10 10 700 500]);plot(safety_range(1:7), lp_PDR(1:7),'-or');title('Adaptive Rate Packet Delivery Ratio vs Distance');xlabel('Distance (m)');ylabel('Packet Delivery Ratio');
 % hold on;
 % plot(safety_range(1:7), lp_PDR_40n(1:7),'-ob');
@@ -232,6 +245,7 @@ plot(density, hp_PDR_SR_3,'-.xb');
 plot(density, hp_PDR_SR_5,'-.xk');
 plot(density, hp_PDR_SR_7,'-.xg');
 ylim([0.05 1.01])
+hold off;
 %legend('20 nodes-.1 sec beacon rate','40 nodes-.1 sec beacon rate','80 nodes-.1 sec beacon rate','160 nodes-.1 sec beacon rate','20 nodes-.05 sec beacon rate','40 nodes-.05 sec beacon rate','80 nodes-.05 sec beacon rate','160 nodes-.05 sec beacon rate');
 legend([num2str(safety_range(2)) ' m range-Risk Scheme-LP Nodes'], [num2str(safety_range(3)) ' m range-Risk Scheme-LP Nodes'], [num2str(safety_range(5)) ' m range-Risk Scheme-LP Nodes'], [num2str(safety_range(7)) ' m range-Risk Scheme-LP Nodes'], ...
 [num2str(safety_range(2)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(3)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(5)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(7)) ' m range-Risk Scheme-HP Nodes']);
@@ -250,8 +264,14 @@ ylim([0.05 1.01])
 %legend('20 nodes-.1 sec beacon rate','40 nodes-.1 sec beacon rate','80 nodes-.1 sec beacon rate','160 nodes-.1 sec beacon rate','20 nodes-.05 sec beacon rate','40 nodes-.05 sec beacon rate','80 nodes-.05 sec beacon rate','160 nodes-.05 sec beacon rate');
 legend([num2str(safety_range(2)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(3)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(5)) ' m range-Risk Scheme-HP Nodes'], [num2str(safety_range(7)) ' m range-Risk Scheme-HP Nodes'], ...
 [num2str(safety_range(2)) ' m range-Control Scheme-HP Nodes'], [num2str(safety_range(3)) ' m range-Control Scheme-HP Nodes'], [num2str(safety_range(5)) ' m range-Control Scheme-HP Nodes'], [num2str(safety_range(7)) ' m range-Control Scheme-HP Nodes']);
+hold off;
+figure('rend','painters','pos',[10 10 700 500]);plot(density, crashes_tot,'-or');title('Crashes vs Node Density');xlabel('Density(nodes/km)');ylabel('Number of Crashes');
+hold on;
+plot(density, crashes_tot_c,'-xb');
+legend(['Adaptive Scheme'],['Control Scheme']);
+hold off;
 
-figure('rend','painters','pos',[10 10 700 500]);plot(density, diff_crashes,'-or');title('Difference in Crashes vs Node Density');xlabel('Density(nodes/km)');ylabel('Packet Delivery Ratio');
+figure('rend','painters','pos',[10 10 700 500]);plot(density, diff_crashes,'-or');title('Crash Difference vs Node Density');xlabel('Density(nodes/km)');ylabel('Number of Crashes');
 
 %ylim([0.05 1.01])
 %legend('20 nodes-.1 sec beacon rate','40 nodes-.1 sec beacon rate','80 nodes-.1 sec beacon rate','160 nodes-.1 sec beacon rate','20 nodes-.05 sec beacon rate','40 nodes-.05 sec beacon rate','80 nodes-.05 sec beacon rate','160 nodes-.05 sec beacon rate');
